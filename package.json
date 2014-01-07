@@ -1,0 +1,27 @@
+{
+  "name": "cfig",
+  "description": "Yet another NodeJS JSON configuration loading + command-line argument parsing library",
+  "version": "1.0.0",
+  "main": "./cfig.js",
+  "author": {
+    "name": "Tim Boudreau",
+    "email": "tim@timboudreau.com"
+  },
+  "keywords": [
+    "configuration",
+    "json"
+  ],
+  "licenses": {
+    "type": "mit"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git@github.com:timboudreau/cfig.git"
+  },
+  "bugs": {
+    "url": "http://github.com/timboudreau/cfig/issues"
+  },
+  "dependencies": {
+    "hoek": "~1.4.1"
+  }
+}
