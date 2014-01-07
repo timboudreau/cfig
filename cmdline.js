@@ -27,7 +27,7 @@ function preprocessArgs(args) {
         var shortPattern = /^\-(\w\w*)$/
         if (shortPattern.test(arg)) {
             for (var i = 0; i < arg.length; i++) {
-                if (arg[i] != '-') {
+                if (arg[i] !== '-') {
                     result.push('-' + arg[i])
                 }
             }

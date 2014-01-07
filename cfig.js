@@ -166,9 +166,9 @@ if (require.main === module) {
         fs.mkdirSync(dir2)
         fs.mkdirSync(dir3)
 
-        fs.writeFileSync(path.join(dir1, 'config.json'), JSON.stringify({foo: 'whee', fromOne: true}))
-        fs.writeFileSync(path.join(dir2, 'config.json'), JSON.stringify({foo: 'moo', fromTwo: true}))
-        fs.writeFileSync(path.join(dir3, 'config.json'), JSON.stringify({foo: 'whatzit', fromThree: true, wug: null}))
+        fs.writeFileSync(path.join(dir1, 'cfig.json'), JSON.stringify({foo: 'whee', fromOne: true}))
+        fs.writeFileSync(path.join(dir2, 'cfig.json'), JSON.stringify({foo: 'moo', fromTwo: true}))
+        fs.writeFileSync(path.join(dir3, 'cfig.json'), JSON.stringify({foo: 'whatzit', fromThree: true, wug: null}))
 
         var assert = require('assert')
 
@@ -176,8 +176,8 @@ if (require.main === module) {
         var wasRun = false;
         new Configuration(true, ds, function(err, dta) {
             assert.ifError(err);
-            assert.equal(dta.foo, 'whatzit');
             assert.equal(dta.baz, 23);
+            assert.equal(dta.foo, 'whatzit', "Should be whatzit is " + dta.foo);
             assert.equal(dta.fromOne, true)
             assert.equal(dta.fromTwo, true)
             assert.equal(dta.fromThree, true)
@@ -215,7 +215,6 @@ if (require.main === module) {
 
             }, 100)
         }, 100)
-
     } catch (err) {
         console.log(err)
         process.exit(1)
