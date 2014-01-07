@@ -68,7 +68,8 @@ is the same as ``--extract --verbose --file``:
         var defaults = { verbose : false }
 
         new Configuration(defaults, function(err, cfig) {
-            
+            // Remember, if you use the configuration object before this
+            // callback is called, it may not be fully initialized
         });
 
 If you pass ``-xvf`` you get
@@ -78,3 +79,9 @@ If you pass ``-xvf`` you get
         verbose : true,
         file : true
     }
+
+Reloading
+---------
+
+``Configuration`` objects have one method:  ``reload(callback)``, which can be
+used if you expect files on disk to be externally changed.
