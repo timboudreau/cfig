@@ -6,7 +6,18 @@ library.  Because the world needed another and I've written this code too many
 times not to have it in a library.
 
 The purpose is to provide a standard, straightforward way of reading configuration
-from configuration files and the command line, and encapsulating that information.
+from configuration files and command-line arguments, and encapsulating that 
+information.
+
+A Configuration object has a *name* - which is the name of JSON files it will
+look for.  By default it looks for ``$NAME.json`` in ``/etc``, ``~/`` and ``./``
+(but you can pass some other set of folders if you want).
+It will read all of them if all are present, with later ones overriding 
+earlier ones.
+
+Then it looks at the command-line arguments (e.g. ``--port 8080`` or ``-p 8080``) 
+and includes those, possibly overriding values from files.  You can supply 
+expansions for single-letter command-line switches.
 
 Usage
 -----
@@ -69,7 +80,7 @@ is the same as ``--extract --verbose --file``:
 
         new Configuration(defaults, function(err, cfig) {
             // Remember, if you use the configuration object before this
-            // callback is called, it may not be fully initialized
+            // callback is called, it may not be fully initialized.
         });
 
 If you pass ``-xvf`` you get

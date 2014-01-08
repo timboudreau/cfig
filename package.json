@@ -1,7 +1,7 @@
 {
   "name": "cfig",
   "description": "Yet another NodeJS JSON configuration loading + command-line argument parsing library",
-  "version": "1.0.0",
+  "version": "1.0.1",
   "main": "./cfig.js",
   "author": {
     "name": "Tim Boudreau",

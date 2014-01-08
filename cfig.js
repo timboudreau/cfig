@@ -98,7 +98,6 @@ function Configuration() {
                     }
                 });
             } else {
-//                NOT TRYING OTHER DIRECTORIES IF ONE FAILS!!
                 cb(null, base);
             }
         });
@@ -138,7 +137,6 @@ function Configuration() {
 }
 
 module.exports = Configuration;
-
 
 Configuration.addExpansions = function(exps) {
     if (typeof exps !== 'object') {
