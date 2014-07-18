@@ -72,7 +72,7 @@ function Configuration() {
             log = arguments[i];
         }
     }
-    dirs = dirs || ['/etc', getUserHome(), './'];
+    dirs = dirs || ['/etc', '/opt/local/etc', getUserHome(), './'];
     defaults = defaults || {};
     if (!name) {
         name = path.basename(require.main.filename, '.js');
