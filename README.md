@@ -39,7 +39,8 @@ In a file called ``myapp.js``:
 Constructor arguments to ``Configuration`` can be supplied in any order;  there
 can be any, none or all of:
 
- * An array of strings - directories to look in for JSON files, instead of ``/etc/``, ``~/`` and ``./``
+ * An array of strings - directories to look in for JSON files, instead of ``/opt/local/etc``, ``/etc/``, ``~/`` and ``./``
+	* As of 1.1, a string may also be an HTTP or HTTPS url to download configuration from
  * An object (non-array javascript hash) containing default values
  * A string - the name for those JSON files
  * A boolean - if true, log the files it's reading as it reads them

@@ -78,8 +78,31 @@ function Configuration() {
         name = path.basename(require.main.filename, '.js');
     }
     var fn = name + '.json';
+    
+    function httpFetch(url, base, cb) {
+        var client = require('./minimal-http-client');
+        if (log) {
+            console.log('Download settings from ' + url);
+        }
+        client(url, headers[url], function(err, data) {
+            if (err) {
+                return cb(err);
+            }
+            try {
+                data = JSON.parse(data);
+            } catch (err2) {
+                return cb(err2);
+            }
+            var res = hoek.applyToDefaults(base, data);
+            cb(null, res);
+        });
+    }
 
+    var urlTest = /^http[s]?:\/\/.*?/;
     function readOne(dir, base, cb) {
+        if (urlTest.test(dir)) {
+            return httpFetch(dir, base, cb);
+        }
         var fl = path.join(dir, fn);
         if (log) {
             console.log('Read settings from ' + fl);
@@ -150,6 +173,12 @@ Configuration.addExpansions = function(exps) {
     return Configuration;
 }
 
+var headers = {};
+
+Configuration.addHeaders = function(url, hdrs) {
+    headers[url] = hdrs;
+}
+
 //test
 if (require.main === module) {
     try {
@@ -169,6 +198,10 @@ if (require.main === module) {
         fs.writeFileSync(path.join(dir3, 'cfig.json'), JSON.stringify({foo: 'whatzit', fromThree: true, wug: null}))
 
         var assert = require('assert')
+        
+        new Configuration(true, ['http://timboudreau.com/files/scottenfinn.json'], function(err, dta) {
+            console.log('URL LOAD GOT ' + util.inspect(dta));
+        });
 
         var ds = {foo: 'bar', baz: 23, wug: 'moo'}
         var wasRun = false;
