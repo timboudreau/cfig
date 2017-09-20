@@ -72,7 +72,7 @@ function Configuration() {
             log = arguments[i];
         }
     }
-    dirs = dirs || ['/etc', '/opt/local/etc', getUserHome(), './'];
+    dirs = dirs || ['/etc', '/opt/local/etc', getUserHome(), './', '/etc/cfig'];
     defaults = defaults || {};
     if (!name) {
         name = path.basename(require.main.filename, '.js');
@@ -229,17 +229,16 @@ if (require.main === module) {
             setTimeout(function() {
                 assert.equal(wasRun, true, "Code was not run");
 
-                process.argv = ['node', 'foo', '-fp', '--mub', 'bar', 'quux', '-b', 'monkey', 'woob'];
+                process.argv = ['node', 'foo', '-fp', '--mub', 'bar', 'quux', '-b', 'monkey', 'woob', '--hey.you', '23'];
                 new Configuration(true, { foo : 35 }, function(err, cfig) {
-                    console.log('HEY!!')
                     console.log(util.inspect(cfig));
                     delete cfig.reload;
                     assert.deepEqual(cfig, {foo: true,
                         p: true,
                         mub: 'bar',
-                        _last: 'woob',
                         quux: true,
                         brr: 'monkey',
+                        hey: { you : 23 },
                         woob: true});
                     console.log('Done.');
                 });

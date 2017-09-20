@@ -92,6 +92,19 @@ If you pass ``-xvf`` you get
         file : true
     }
 
+## Dot Notation
+
+Cfig supports *limited* dot-notation in command-line arguments - that is, passing
+`--foo.bar` will get you `{ foo : { bar : true }}`, but passing array offsets, e.g.
+`--foo.1` is not supported.
+
+## Types
+
+Command-line arguments are converted to booleans or numbers under the following conditions:
+
+ * *number* - `/^\d+/` matches the value
+ * *boolean* - the strings 'true' or 'false' match the value
+
 Reloading
 ---------
 

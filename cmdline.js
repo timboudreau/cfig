@@ -1,29 +1,29 @@
 /*
-The MIT License (MIT)
-
-Copyright (c) 2014 Tim Boudreau
-
-Permission is hereby granted, free of charge, to any person obtaining a copy of
-this software and associated documentation files (the "Software"), to deal in
-the Software without restriction, including without limitation the rights to
-use, copy, modify, merge, publish, distribute, sublicense, and/or sell copies of
-the Software, and to permit persons to whom the Software is furnished to do so,
-subject to the following conditions:
-
-The above copyright notice and this permission notice shall be included in all
-copies or substantial portions of the Software.
-
-THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
-IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY, FITNESS
-FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR
-COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER
-IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN
-CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
+ The MIT License (MIT)
+ 
+ Copyright (c) 2014 Tim Boudreau
+ 
+ Permission is hereby granted, free of charge, to any person obtaining a copy of
+ this software and associated documentation files (the "Software"), to deal in
+ the Software without restriction, including without limitation the rights to
+ use, copy, modify, merge, publish, distribute, sublicense, and/or sell copies of
+ the Software, and to permit persons to whom the Software is furnished to do so,
+ subject to the following conditions:
+ 
+ The above copyright notice and this permission notice shall be included in all
+ copies or substantial portions of the Software.
+ 
+ THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+ IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY, FITNESS
+ FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR
+ COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER
+ IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN
+ CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
  */
-var path = require('path'), util=require('util');
+const path = require('path'), util = require('util'), hoek = require('hoek');
 function preprocessArgs(args) {
     var result = [];
-    args.forEach(function(arg) {
+    args.forEach(function (arg) {
         var shortPattern = /^\-(\w\w*)$/
         if (shortPattern.test(arg)) {
             for (var i = 0; i < arg.length; i++) {
@@ -61,7 +61,7 @@ function parseArgs() {
         if (typeof arguments[i] === 'undefined') {
             continue;
         }
-        if (util.isArray(arguments[i])) {
+        if (Array.isArray(arguments[i])) {
             processArgs = arguments[i]
         } else if (typeof arguments[i] === 'object') {
             expansions = arguments[i]
@@ -106,22 +106,71 @@ function parseArgs() {
         if (previous) {
             result[previous] = arg;
             previous = null;
-            if (args.length > 0) {
-                result['_last'] = args[args.length - 1];
-            }
         } else {
             result[arg] = true;
-            if (args.length > 0) {
-                result['_last'] = args[args.length - 1];
-            }
+        }
+    }
+    return undot(result);
+}
+
+function keys(hash) {
+    if (Array.isArray(hash)) {
+        var result = [];
+        for (var i = 0; i < hash.length; i++) {
+            result.push(i);
+        }
+    } else {
+        return Object.keys(hash);
+    }
+}
+
+function undot(hash) {
+    if (typeof hash === 'string' || typeof hash === 'boolean' || typeof hash === 'number') {
+        return hash;
+    }
+    var result = {};
+    var ks = keys(hash);
+    for (var i = 0; i < ks.length; i++) {
+        var key = ks[i];
+        var found = undotOne(key, hash[key]);
+        if (typeof found === 'object') {
+            hoek.merge(result, found, false, true);
+        } else {
+            result[key] = found;
         }
     }
     return result;
 }
+
+function typify(obj) {
+    if (typeof obj === 'string') {
+        if (/^\d+$/.test(obj)) {
+            return parseInt(obj);
+        } else if ('true' === obj) {
+            return true;
+        } else if ('false' === obj) {
+            return false;
+        }
+        return obj;
+    } else {
+        return obj;
+    }
+}
+
+function undotOne(key, val) {
+    var parts = key.split(/\.(.+)/);
+    var result = {};
+    if (parts.length > 1) {
+        result[parts[0]] = undotOne(parts[1], val);
+        return result;
+    }
+    result[key] = typify(val);
+    return result;
+}
+
 module.exports.parseArgs = parseArgs;
 
 if (require.main === module) {
-    var util = require('util');
     var assert = require('assert');
 
     var x = parseArgs();
@@ -141,7 +190,6 @@ if (require.main === module) {
         foo: 'monkey',
         bugle: 'whatzit',
         poodle: 'hoover',
-        _last: 'hoover'
     }
 
     assert.deepEqual(x, expect);
@@ -151,7 +199,6 @@ if (require.main === module) {
         foo: true,
         bugle: 'hoo',
         poodle: true,
-        _last: 'hah',
         hah: true
     }
     x = parseArgs(expansions, args);
@@ -181,10 +228,23 @@ if (require.main === module) {
     x = parseArgs(null, ['food', 'bug', 'monkey', 'food', 'stew', '--foo', 'bar'])
 
     assert.deepEqual(x, {food: true,
-        _last: 'bar',
         bug: true,
         monkey: true,
         stew: true,
         foo: 'bar'});
+
+    x = parseArgs(null, ['foo', 'bar.baz', 'woo.hoo.you']);
+    expect = {
+        foo: true, bar: {baz: true}, woo: {hoo: {you: true}}};
+
+
+    x = parseArgs(null, ['--skiddoo', '23', '--the.meaning', '42', '--i.think.its', 'true', '--but.that.is', 'false', '--but.that.will', 'do'])
+    expect = {skiddoo: 23,
+        the: {meaning: 42},
+        i: {think: {its: true}},
+        but: {that: {is: false, will: 'do'}}};
+
+    assert.deepEqual(x, expect);
+
     console.log('Done.')
 }
