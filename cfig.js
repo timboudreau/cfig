@@ -78,13 +78,13 @@ function Configuration() {
         name = path.basename(require.main.filename, '.js');
     }
     var fn = name + '.json';
-    
+
     function httpFetch(url, base, cb) {
         var client = require('./minimal-http-client');
         if (log) {
             console.log('Download settings from ' + url);
         }
-        client(url, headers[url], function(err, data) {
+        client(url, headers[url], function (err, data) {
             if (err) {
                 return cb(err);
             }
@@ -107,9 +107,9 @@ function Configuration() {
         if (log) {
             console.log('Read settings from ' + fl);
         }
-        fs.exists(fl, function(exists) {
+        fs.exists(fl, function (exists) {
             if (exists) {
-                fs.readFile(fl, 'utf8', function(err, data) {
+                fs.readFile(fl, 'utf8', function (err, data) {
                     if (err)
                         return cb(err);
                     try {
@@ -138,10 +138,8 @@ function Configuration() {
             for (var key in data) {
                 self[key] = data[key];
             }
-            var last = cmdline.parseArgs(Configuration.expansions);
-            for (var key in last) {
-                self[key] = last[key];
-            }
+            var last = cmdline.parseArgs(Configuration.expansions, Configuration.args || process.argv.slice(2));
+            hoek.merge(self, last);
             if (callback) {
                 callback(null, self);
             }
@@ -161,7 +159,7 @@ function Configuration() {
 
 module.exports = Configuration;
 
-Configuration.addExpansions = function(exps) {
+Configuration.addExpansions = function (exps) {
     if (typeof exps !== 'object') {
         throw new Error("Not an object: " + util.inspect(exps))
     }
@@ -175,7 +173,7 @@ Configuration.addExpansions = function(exps) {
 
 var headers = {};
 
-Configuration.addHeaders = function(url, hdrs) {
+Configuration.addHeaders = function (url, hdrs) {
     headers[url] = hdrs;
 }
 
@@ -198,14 +196,14 @@ if (require.main === module) {
         fs.writeFileSync(path.join(dir3, 'cfig.json'), JSON.stringify({foo: 'whatzit', fromThree: true, wug: null}))
 
         var assert = require('assert')
-        
-        new Configuration(true, ['http://timboudreau.com/files/scottenfinn.json'], function(err, dta) {
+
+        new Configuration(true, ['http://timboudreau.com/files/scottenfinn.json'], function (err, dta) {
             console.log('URL LOAD GOT ' + util.inspect(dta));
         });
 
         var ds = {foo: 'bar', baz: 23, wug: 'moo'}
         var wasRun = false;
-        new Configuration(true, ds, function(err, dta) {
+        new Configuration(true, ds, function (err, dta) {
             assert.ifError(err);
             assert.equal(dta.baz, 23);
             assert.equal(dta.foo, 'whatzit', "Should be whatzit is " + dta.foo);
@@ -216,21 +214,25 @@ if (require.main === module) {
             wasRun = true;
         }, [dir1, dir2, dir3]);
 
-        setTimeout(function() {
+        setTimeout(function () {
             assert.equal(true, wasRun)
             wasRun = false;
             Configuration.addExpansions({f: 'foo'})
             Configuration.addExpansions({q: 'quux'})
             assert.deepEqual(Configuration.expansions, {f: 'foo', q: 'quux'})
-            new Configuration.addExpansions({b: 'brr'})(true, function(err, cfig) {
+            new Configuration.addExpansions({b: 'brr'})(true, function (err, cfig) {
+                if (err)
+                    throw err;
                 assert.deepEqual(Configuration.expansions, {f: 'foo', q: 'quux', b: 'brr'})
                 wasRun = true;
             });
-            setTimeout(function() {
+            setTimeout(function () {
                 assert.equal(wasRun, true, "Code was not run");
 
                 process.argv = ['node', 'foo', '-fp', '--mub', 'bar', 'quux', '-b', 'monkey', 'woob', '--hey.you', '23'];
-                new Configuration(true, { foo : 35 }, function(err, cfig) {
+                new Configuration(true, {foo: 35}, function (err, cfig) {
+                    if (err)
+                        throw err;
                     console.log(util.inspect(cfig));
                     delete cfig.reload;
                     assert.deepEqual(cfig, {foo: true,
@@ -238,13 +240,39 @@ if (require.main === module) {
                         mub: 'bar',
                         quux: true,
                         brr: 'monkey',
-                        hey: { you : 23 },
+                        hey: {you: 23},
                         woob: true});
+
+                    const defaults = {
+                        queue: {
+                            prefix: 'bq',
+                            stallInterval: 15000,
+                            redis: {
+                                host: '127.0.0.1',
+                                port: 6379,
+                                db: 0,
+                                options: {}
+                            },
+                            getEvents: false,
+                            sendEvents: true,
+                            isWorker: false,
+                            removeOnSuccess: true,
+                            catchExceptions: false
+                        },
+                        test: false
+                    };
+                    Configuration.args = ['--queue.redis.port', '3207', '-r', 'redis.foo.com'];
+                    Configuration.addExpansions({r: 'queue.redis.host'});
+                    new Configuration(defaults, [], function (err, info) {
+                        if (err)
+                            throw err;
+                        console.log(util.inspect(info, {depth: 10}));
+                        assert.deepEqual(info.queue.redis, {host: 'redis.foo.com', port: 3207, db: 0, options: {}});
+                    });
                     console.log('Done.');
                 });
-
             }, 100)
-        }, 100)
+        }, 100);
     } catch (err) {
         console.log(err)
         process.exit(1)
