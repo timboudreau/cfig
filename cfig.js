@@ -1,18 +1,18 @@
 /*
  The MIT License (MIT)
- 
+
  Copyright (c) 2014 Tim Boudreau
- 
+
  Permission is hereby granted, free of charge, to any person obtaining a copy of
  this software and associated documentation files (the "Software"), to deal in
  the Software without restriction, including without limitation the rights to
  use, copy, modify, merge, publish, distribute, sublicense, and/or sell copies of
  the Software, and to permit persons to whom the Software is furnished to do so,
  subject to the following conditions:
- 
+
  The above copyright notice and this permission notice shall be included in all
  copies or substantial portions of the Software.
- 
+
  THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
  IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY, FITNESS
  FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR
@@ -22,21 +22,25 @@
  */
 const path = require( 'path' ), hoek = require( 'hoek' ), fs = require( 'fs' ),
         util = require( 'util' ), cmdline = require( './cmdline' ),
-        Joi = require('joi');
+        Joi = require( 'joi' );
 
 function getUserHome() {
     return process.env[(process.platform === 'win32') ? 'USERPROFILE' : 'HOME'] || '~/';
 }
 
+const context = {};
+
 function Configuration() {
-    var self = this;
+    var self = {};
     var dirs = null;
     var name = null;
     var defaults = null;
     var callback = null;
     var log = false;
     var schema = null;
-    
+    var exp = context.expansions;
+    var cargs = context.args;
+
     for (var i = 0; i < arguments.length; i++) {
         if (typeof arguments[i] === 'undefined') {
             continue;
@@ -113,33 +117,37 @@ function Configuration() {
         fs.exists( fl, function ( exists ) {
             if (exists) {
                 fs.readFile( fl, 'utf8', function ( err, data ) {
-                    if (err)
+                    if (err) {
                         return cb( err );
+                    }
+                    var obj;
                     try {
-                        var obj = JSON.parse( data );
-                        if (log) {
-                            console.log( fl, obj );
-                        }
-                        var res = hoek.applyToDefaults( base, obj );
-                        cb( null, res );
+                        obj = JSON.parse( data );
                     } catch ( err ) {
                         console.error( 'Bad json in ' + fl, err.message );
                         cb( err, data );
                     }
+                    if (log) {
+                        console.log( fl, obj );
+                    }
+                    var res = hoek.applyToDefaults( base, obj );
+                    cb( null, res );
                 } );
             } else {
-                console.log( '...no such file ' + fl );
+                if (log) {
+                  console.log( '...no such file ' + fl );
+                }
                 cb( null, base );
             }
         } );
     }
-    
-    function validate(obj) {
+
+    function validate( obj ) {
         if (schema) {
-            var err = Joi.validate(obj, schema, { allowUnknown : true, skipFunctions : true }).error;
+            var err = Joi.validate( obj, schema, {allowUnknown: true, skipFunctions: true} ).error;
             if (err) {
                 if (callback) {
-                    callback(err);
+                    callback( err );
                     return false;
                 } else {
                     throw err;
@@ -149,6 +157,7 @@ function Configuration() {
         return true;
     }
 
+    const me = this;
     var arr = hoek.clone( dirs ).reverse();
     function go( err, data ) {
         if (err) {
@@ -159,14 +168,15 @@ function Configuration() {
             }
         }
         if (arr.length === 0) {
-            hoek.merge(self, data);
-            var last = cmdline.parseArgs( Configuration.expansions, Configuration.args || process.argv.slice( 2 ) );
+            hoek.merge( self, data );
+            var last = cmdline.parseArgs( exp || Configuration.expansions, cargs || Configuration.args || process.argv.slice( 2 ) );
             hoek.merge( self, last );
-            if (validate(self)) {
-            if (callback) {
-                callback( null, self );
+            hoek.merge(  me, self); // Compatibility
+            if (validate( self )) {
+                if (callback) {
+                    callback( null, self );
+                }
             }
-        }
         } else {
             var d = arr.pop();
             readOne( d, data, go );
@@ -179,10 +189,57 @@ function Configuration() {
     }
     this.reload = reload;
     reload( callback );
+
+    this.child = function(name, expansions, args) {
+      var createFunction = Configuration.withExpansions(expansions || {}, args);
+      return function() {
+        var fakeArgs = [];
+        var callback = null;
+        function localCallback(err, what) {
+          self[name] = what;
+          callback(err, self);
+        }
+        for (var i=0; i < arguments.length; i++) {
+          if (typeof arguments[i] === 'function') {
+            callback = arguments[i];
+            fakeArgs.push(localCallback);
+          } else {
+            fakeArgs.push(arguments[i]);
+          }
+        }
+        if (callback === null) {
+          throw new Error("no callback passed");
+        }
+        createFunction.apply(null, fakeArgs);
+      }
+    }
+    return this;
 }
 
 module.exports = Configuration;
 
+Configuration.withExpansions = function ( exps, args ) {
+    if (typeof exps !== 'object') {
+        throw new Error( "Not an object: " + util.inspect( exps ) );
+    }
+    return function () {
+        context.expansions = exps;
+        context.args = args;
+        try {
+            return Configuration.prototype.constructor.apply( null, arguments );
+        } finally {
+            delete context.expansions;
+            delete context.args;
+        }
+    };
+};
+
+/**
+ * Deprecated
+ *
+ * @param {type} exps
+ * @return {nm$_cfig.Configuration}
+ */
 Configuration.addExpansions = function ( exps ) {
     if (typeof exps !== 'object') {
         throw new Error( "Not an object: " + util.inspect( exps ) );
@@ -193,8 +250,8 @@ Configuration.addExpansions = function ( exps ) {
         Configuration.expansions = exps;
     }
     return Configuration;
-    };
-    
+};
+
 var headers = {};
 
 Configuration.addHeaders = function ( url, hdrs ) {

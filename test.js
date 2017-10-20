@@ -109,7 +109,7 @@ setupFiles();
 function testCfig() {
     var ds = {foo: 'bar', baz: 23, wug: 'moo'};
     var wasRun = false;
-    new Configuration( true, ds, function ( err, dta ) {
+    new Configuration( ds, function ( err, dta ) {
         assert.ifError( err );
         assert.equal( dta.baz, 23 );
         assert.equal( dta.foo, 'whatzit', "Should be whatzit is " + dta.foo );
@@ -126,7 +126,7 @@ function testCfig() {
         Configuration.addExpansions( {f: 'foo'} );
         Configuration.addExpansions( {q: 'quux'} );
         assert.deepEqual( Configuration.expansions, {f: 'foo', q: 'quux'} );
-        new Configuration.addExpansions( {b: 'brr'} )( true, function ( err, cfig ) {
+        new Configuration.addExpansions( {b: 'brr'} )( function ( err, cfig ) {
             assert.ifError( err );
             assert.deepEqual( Configuration.expansions, {f: 'foo', q: 'quux', b: 'brr'} );
             wasRun = true;
@@ -135,7 +135,7 @@ function testCfig() {
             assert.equal( wasRun, true, "Code was not run" );
 
             process.argv = [ 'node', 'foo', '-fp', '--mub', 'bar', 'quux', '-b', 'monkey', 'woob', '--hey.you', '23' ];
-            new Configuration( true, {foo: 35}, function ( err, cfig ) {
+            new Configuration( {foo: 35}, function ( err, cfig ) {
                 assert.ifError( err );
                 delete cfig.reload;
                 assert.deepEqual( cfig, {foo: true,
@@ -261,15 +261,38 @@ function testJoi() {
         assert( data.foo );
         assert( data.skiddoo );
     } );
-    new Configuration({wunk : true}, schema, [dir5], function (err, data) {
-        assert(util.isError(err))
-    });
-    new Configuration(schema, [dir5], function (err, data) {
-        assert(util.isError(err))
-    });
-    new Configuration({wunk : true, skiddoo : 11}, schema, [dir5], function (err, data) {
-        assert(util.isError(err))
-    });
+    new Configuration( {wunk: true}, schema, [ dir5 ], function ( err, data ) {
+        assert( util.isError( err ) );
+    } );
+    new Configuration( schema, [ dir5 ], function ( err, data ) {
+        assert( util.isError( err ) );
+    } );
+    new Configuration( {wunk: true, skiddoo: 11}, schema, [ dir5 ], function ( err, data ) {
+        assert( util.isError( err ) );
+    } );
+}
+
+function testWithExpansionsAndArgs() {
+    var x = Configuration.withExpansions( {m: 'moo'}, [ '-m', 'monkey' ] )( {moo: 'whatzit'}, [ dir4 ], function ( err, data ) {
+        assert.ifError( err );
+        assert( data );
+        assert.equal( data.moo, 'monkey' );
+    } );
+}
+
+function testChild() {
+    var x = Configuration.withExpansions( {m: 'moo'}, [ '-m', 'monkey' ] )( {moo: 'whatzit'}, [ dir4 ], function ( err, data ) {
+        assert.ifError( err );
+        assert( data );
+        assert.equal( data.moo, 'monkey' );
+    } );
+    var y = x.child( 'wookie' )( {wunk: 'bean'}, [ dir5 ], function ( err, data ) {
+        assert.ifError( err );
+        assert.deepEqual( data, {moo: 'monkey',
+            foo: 'bar',
+            skiddoo: 23,
+            wookie: {wunk: 'bean', foo: 'bar', skiddoo: 'hello'}} )
+    } );
 }
 
 var failures = [ ];
@@ -299,9 +322,6 @@ function oneTest( test ) {
     d.on( 'error', function ( err ) {
         console.error( 'ERROR ' + test.name );
         failures.push( {name: test.name, err: err} );
-        setTimeout( () => {
-            process.exit( 1 );
-        }, 20 );
     } );
     d.run( test );
 }
@@ -318,4 +338,6 @@ runTests(
         testCmdline,
         testHttp,
         testJoi,
+        testWithExpansionsAndArgs,
+        testChild
         );
