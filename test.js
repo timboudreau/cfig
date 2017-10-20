@@ -5,6 +5,8 @@ const Configuration = require( './cfig' )
         , assert = require( 'assert' )
         , path = require( 'path' )
         , util = require( 'util' )
+        , domain = require( 'domain' )
+        , Joi = require( 'joi' )
         ;
 
 const cleanupDirs = [ ];
@@ -52,7 +54,7 @@ function testHttp() {
     var stop;
     var sdata = null;
     stop = start( () => {
-        new Configuration( [ 'http://127.0.0.1:7638' ], {boo: 58, wug : 40}, function ( err, dta ) {
+        new Configuration( [ 'http://127.0.0.1:7638' ], {boo: 58, wug: 40}, function ( err, dta ) {
             if (err) {
                 throw err;
             }
@@ -73,30 +75,38 @@ function testHttp() {
 const fixture1 = {foo: 'whee', fromOne: true};
 const fixture2 = {foo: 'moo', fromTwo: true};
 const fixture3 = {foo: 'whatzit', fromThree: true, wug: null};
+const fixture4 = {foo: 'bar', skiddoo: 23};
+const fixture5 = {foo: 'bar', skiddoo: 'hello'};
 const now = '' + new Date().getTime();
 const tmp = require( 'os' ).tmpdir();
 const dir1 = path.join( tmp, 'configTest_' + now + '_1' );
 const dir2 = path.join( tmp, 'configTest_' + now + '_2' );
 const dir3 = path.join( tmp, 'configTest_' + now + '_3' );
+const dir4 = path.join( tmp, 'configTest_' + now + '_4' );
+const dir5 = path.join( tmp, 'configTest_' + now + '_5' );
 const file1 = path.join( dir1, 'test.json' );
 const file2 = path.join( dir2, 'test.json' );
 const file3 = path.join( dir3, 'test.json' );
-
+const file4 = path.join( dir4, 'test.json' );
+const file5 = path.join( dir5, 'test.json' );
+var setup = false;
 
 function setupFiles() {
-
     mkdir( dir1 );
     mkdir( dir2 );
     mkdir( dir3 );
+    mkdir( dir4 );
+    mkdir( dir5 );
 
     writeFile( file1, fixture1 );
     writeFile( file2, fixture2 );
     writeFile( file3, fixture3 );
-
+    writeFile( file4, fixture4 );
+    writeFile( file5, fixture5 );
 }
+setupFiles();
 
 function testCfig() {
-    setupFiles();
     var ds = {foo: 'bar', baz: 23, wug: 'moo'};
     var wasRun = false;
     new Configuration( true, ds, function ( err, dta ) {
@@ -117,8 +127,7 @@ function testCfig() {
         Configuration.addExpansions( {q: 'quux'} );
         assert.deepEqual( Configuration.expansions, {f: 'foo', q: 'quux'} );
         new Configuration.addExpansions( {b: 'brr'} )( true, function ( err, cfig ) {
-            if (err)
-                throw err;
+            assert.ifError( err );
             assert.deepEqual( Configuration.expansions, {f: 'foo', q: 'quux', b: 'brr'} );
             wasRun = true;
         } );
@@ -127,8 +136,7 @@ function testCfig() {
 
             process.argv = [ 'node', 'foo', '-fp', '--mub', 'bar', 'quux', '-b', 'monkey', 'woob', '--hey.you', '23' ];
             new Configuration( true, {foo: 35}, function ( err, cfig ) {
-                if (err)
-                    throw err;
+                assert.ifError( err );
                 delete cfig.reload;
                 assert.deepEqual( cfig, {foo: true,
                     p: true,
@@ -159,8 +167,7 @@ function testCfig() {
                 Configuration.args = [ '--queue.redis.port', '3207', '-r', 'redis.foo.com' ];
                 Configuration.addExpansions( {r: 'queue.redis.host'} );
                 new Configuration( defaults, [ ], function ( err, info ) {
-                    if (err)
-                        throw err;
+                    assert.ifError( err );
                     assert.deepEqual( info.queue.redis, {host: 'redis.foo.com', port: 3207, db: 0, options: {}} );
                 } );
             } );
@@ -242,12 +249,73 @@ function testCmdline() {
     assert.deepEqual( x, expect );
 }
 
-process.on( 'exit', cleanup );
+function testJoi() {
+    const schema = Joi.object().keys( {
+        foo: Joi.string().min( 3 ).max( 3 ).regex( /^b.*/ ),
+        skiddoo: Joi.number().integer().min( 23 ),
+        wunk: Joi.boolean()
+    } );
+    new Configuration( {wunk: true, skiddoo: 24}, schema, [ dir4 ], function ( err, data ) {
+        assert.ifError( err );
+        assert( data.wunk );
+        assert( data.foo );
+        assert( data.skiddoo );
+    } );
+    new Configuration({wunk : true}, schema, [dir5], function (err, data) {
+        assert(util.isError(err))
+    });
+    new Configuration(schema, [dir5], function (err, data) {
+        assert(util.isError(err))
+    });
+    new Configuration({wunk : true, skiddoo : 11}, schema, [dir5], function (err, data) {
+        assert(util.isError(err))
+    });
+}
+
+var failures = [ ];
 process.on( 'uncaughtException', ( err ) => {
     console.error( err );
     process.exit( 1 );
 } );
+process.on( 'exit', () => {
+    try {
+        cleanup();
+    } catch ( err ) {
+        failures.push( {name: 'cleanup', err: err} );
+    }
+    if (failures.length > 0) {
+        for (var i = 0; i < failures.length; i++) {
+            var failed = failures[ i ];
+            console.log( failed.name + ' failed', failed.err.stack );
+            console.log( '\n' );
+        }
+        process.exit( 1 );
+    }
+    console.log( 'Success.' );
+} );
 
-testCfig();
-testCmdline();
-testHttp();
+function oneTest( test ) {
+    const d = domain.create();
+    d.on( 'error', function ( err ) {
+        console.error( 'ERROR ' + test.name );
+        failures.push( {name: test.name, err: err} );
+        setTimeout( () => {
+            process.exit( 1 );
+        }, 20 );
+    } );
+    d.run( test );
+}
+
+function runTests() {
+    for (var i = 0; i < arguments.length; i++) {
+        assert( "not a function : " + util.inspect( arguments[i] ), typeof arguments[i] === 'function' );
+        oneTest( arguments[i] );
+    }
+}
+
+runTests(
+        testCfig,
+        testCmdline,
+        testHttp,
+        testJoi,
+        );

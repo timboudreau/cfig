@@ -20,8 +20,9 @@
  IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN
  CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
  */
-var path = require( 'path' ), hoek = require( 'hoek' ), fs = require( 'fs' ),
-        util = require( 'util' ), cmdline = require( './cmdline' );
+const path = require( 'path' ), hoek = require( 'hoek' ), fs = require( 'fs' ),
+        util = require( 'util' ), cmdline = require( './cmdline' ),
+        Joi = require('joi');
 
 function getUserHome() {
     return process.env[(process.platform === 'win32') ? 'USERPROFILE' : 'HOME'] || '~/';
@@ -34,6 +35,8 @@ function Configuration() {
     var defaults = null;
     var callback = null;
     var log = false;
+    var schema = null;
+    
     for (var i = 0; i < arguments.length; i++) {
         if (typeof arguments[i] === 'undefined') {
             continue;
@@ -47,12 +50,17 @@ function Configuration() {
                 throw new Error( "More than one string argument passed" );
             }
             name = arguments[i];
-        } else if (typeof arguments[i] === 'object' && !util.isArray( arguments[i] )) {
+        } else if (typeof arguments[i] === 'object' && !Array.isArray( arguments[i] ) && arguments[i].isJoi) {
+            if (schema) {
+                throw new Error( "More than one Joi schema argument passed" );
+            }
+            schema = arguments[i];
+        } else if (typeof arguments[i] === 'object' && !Array.isArray( arguments[i] ) && !arguments[i].isJoi) {
             if (defaults) {
                 throw new Error( "More than one object argument passed" );
             }
             defaults = arguments[i];
-        } else if (typeof arguments[i] === 'function') {
+        } else if (typeof arguments[i] === 'function' && !arguments[i].isJoi) {
             if (callback) {
                 throw new Error( "More than one function argument passed" );
             }
@@ -88,13 +96,12 @@ function Configuration() {
             } catch ( err2 ) {
                 return cb( err2 );
             }
-            console.log( 'APPLY ', data );
             var res = hoek.applyToDefaults( base, data );
             cb( null, res );
         } );
     }
 
-    var urlTest = /^http[s]?:\/\/.*?/;
+    const urlTest = /^http[s]?:\/\/.*?/;
     function readOne( dir, base, cb ) {
         if (urlTest.test( dir )) {
             return httpFetch( dir, base, cb );
@@ -126,24 +133,40 @@ function Configuration() {
             }
         } );
     }
+    
+    function validate(obj) {
+        if (schema) {
+            var err = Joi.validate(obj, schema, { allowUnknown : true, skipFunctions : true }).error;
+            if (err) {
+                if (callback) {
+                    callback(err);
+                    return false;
+                } else {
+                    throw err;
+                }
+            }
+        }
+        return true;
+    }
 
     var arr = hoek.clone( dirs ).reverse();
     function go( err, data ) {
         if (err) {
             if (callback) {
                 return callback( err );
-            } else
+            } else {
                 throw err;
+            }
         }
         if (arr.length === 0) {
-            for (var key in data) {
-                self[key] = data[key];
-            }
+            hoek.merge(self, data);
             var last = cmdline.parseArgs( Configuration.expansions, Configuration.args || process.argv.slice( 2 ) );
             hoek.merge( self, last );
+            if (validate(self)) {
             if (callback) {
                 callback( null, self );
             }
+        }
         } else {
             var d = arr.pop();
             readOne( d, data, go );
@@ -162,7 +185,7 @@ module.exports = Configuration;
 
 Configuration.addExpansions = function ( exps ) {
     if (typeof exps !== 'object') {
-        throw new Error( "Not an object: " + util.inspect( exps ) )
+        throw new Error( "Not an object: " + util.inspect( exps ) );
     }
     if (Configuration.expansions) {
         Configuration.expansions = hoek.merge( exps, Configuration.expansions );
@@ -170,10 +193,10 @@ Configuration.addExpansions = function ( exps ) {
         Configuration.expansions = exps;
     }
     return Configuration;
-}
-
+    };
+    
 var headers = {};
 
 Configuration.addHeaders = function ( url, hdrs ) {
     headers[url] = hdrs;
-}
+};
