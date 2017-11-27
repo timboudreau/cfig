@@ -295,6 +295,60 @@ function testChild() {
     } );
 }
 
+function testEnvWrapper() {
+    process.env['woo.wumble'] = 'moog';
+    process.env['gugu'] = '13';
+    process.env['whoo'] = 'TRUE';
+    process.env['whug'] = 'TRUTHY';
+    var defs = {'HOME': '/foober', whoo: false, whug: false, boozle: 'racket', gugu: 57, woo: {wumble: 'toes'}};
+    var res = Configuration.withEnvironment( defs, [ dir4 ], function ( err, edata ) {
+        assert.notEqual( defs.HOME, edata.HOME );
+        var e;
+        try {
+            edata.HOME = 'heya';
+        } catch ( err ) {
+            e = err;
+        }
+        if (typeof e === 'undefined') {
+            throw new Error( "Should have thrown an error" );
+        }
+        assert.equal( "bar", edata.foo );
+        assert.equal( 23, edata.skiddoo );
+        assert.equal( 'moog', edata.woo.wumble );
+        assert( typeof edata['gugu'] === 'number' );
+        assert.equal( 13, edata.gugu );
+        assert( typeof edata.whug === 'string' );
+        assert.equal( 'TRUTHY', edata.whug );
+        assert( typeof edata.whoo === 'boolean' );
+        assert( edata.whoo === true );
+    } );
+}
+
+function testEnvWrapperWithExpansions() {
+    var defs = {'HOME': '/goober', boozle: 'racket'};
+    var res = Configuration.withEnvironmentAndExpansions( {h: 'HOME', m: 'moo'}, [ '-m', 'marsupial', '-h', '/tuber' ] )( defs, [ dir4 ], function ( err, edata ) {
+        assert.notEqual( defs.HOME, edata.HOME );
+        assert.notEqual( '/tuber', edata.HOME );
+        var e;
+        try {
+            edata.HOME = 'hoog';
+        } catch ( err ) {
+            e = err;
+        }
+        if (typeof e === 'undefined') {
+            throw new Error( "Should have thrown an error" );
+        }
+        assert.equal( "bar", edata.foo );
+        assert.equal( 23, edata.skiddoo );
+        assert.equal( 'marsupial', edata.moo );
+    } );
+}
+
+function testSetEnv() {
+    process.env['_wiggle'] = 'foob';
+    assert.equal( 'foob', process.env['_wiggle'] );
+}
+
 var failures = [ ];
 process.on( 'uncaughtException', ( err ) => {
     console.error( err );
@@ -339,5 +393,8 @@ runTests(
         testHttp,
         testJoi,
         testWithExpansionsAndArgs,
-        testChild
+        testChild,
+        testSetEnv,
+        testEnvWrapper,
+        testEnvWrapperWithExpansions
         );

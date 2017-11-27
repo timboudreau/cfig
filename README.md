@@ -113,6 +113,24 @@ Cfig supports *limited* dot-notation in command-line arguments - that is, passin
 `--foo.bar` will get you `{ foo : { bar : true }}`, but passing array offsets, e.g.
 `--foo.1` is not supported.
 
+## Environment Variables
+
+To allow environment variables to override configuration defaults, use the constructor
+function `Configuration.withEnvironment()` or `Configuration.withEnvironmentAndExpansions()` (the latter
+returns a function you call with the regular arguments) -
+your callback will receive a _read-only_ object with getters for all keys defined in any
+defaults passed or configuration files read.  Nested object properties are looked up in the
+environment as variables named `outerName.innerProperty`, so if you pass defaults such as
+`{ foo : { bar : 'baz'}}` then an environment variable `foo.bar` will override it.
+
+*A note on numbers:* Environment variables are always strings;  if the value that would be returned
+for a key, were environment variables not considered, is a number, and the value of the corresponding environment
+variable *is parsable as an integer or floating point number*, then it will be converted to a number.
+
+Similarly, in the case of booleans, if the default value is a boolean and the environment variable is
+`0`, `false` or `FALSE` it is converted to Javascript boolean false;  if it is `1`, `true` or `TRUE` it is
+converted to Javascript true; otherwise the string value of the environment variable is passed unaltered.
+
 ## Types
 
 Command-line arguments are converted to booleans or numbers under the following conditions:

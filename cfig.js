@@ -1,18 +1,18 @@
 /*
  The MIT License (MIT)
-
+ 
  Copyright (c) 2014 Tim Boudreau
-
+ 
  Permission is hereby granted, free of charge, to any person obtaining a copy of
  this software and associated documentation files (the "Software"), to deal in
  the Software without restriction, including without limitation the rights to
  use, copy, modify, merge, publish, distribute, sublicense, and/or sell copies of
  the Software, and to permit persons to whom the Software is furnished to do so,
  subject to the following conditions:
-
+ 
  The above copyright notice and this permission notice shall be included in all
  copies or substantial portions of the Software.
-
+ 
  THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
  IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY, FITNESS
  FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR
@@ -22,7 +22,7 @@
  */
 const path = require( 'path' ), hoek = require( 'hoek' ), fs = require( 'fs' ),
         util = require( 'util' ), cmdline = require( './cmdline' ),
-        Joi = require( 'joi' );
+        Joi = require( 'joi' ), EnvWrapper = require( './env-wrapper' );
 
 function getUserHome() {
     return process.env[(process.platform === 'win32') ? 'USERPROFILE' : 'HOME'] || '~/';
@@ -135,7 +135,7 @@ function Configuration() {
                 } );
             } else {
                 if (log) {
-                  console.log( '...no such file ' + fl );
+                    console.log( '...no such file ' + fl );
                 }
                 cb( null, base );
             }
@@ -171,7 +171,7 @@ function Configuration() {
             hoek.merge( self, data );
             var last = cmdline.parseArgs( exp || Configuration.expansions, cargs || Configuration.args || process.argv.slice( 2 ) );
             hoek.merge( self, last );
-            hoek.merge(  me, self); // Compatibility
+            hoek.merge( me, self ); // Compatibility
             if (validate( self )) {
                 if (callback) {
                     callback( null, self );
@@ -190,29 +190,29 @@ function Configuration() {
     this.reload = reload;
     reload( callback );
 
-    this.child = function(name, expansions, args) {
-      var createFunction = Configuration.withExpansions(expansions || {}, args);
-      return function() {
-        var fakeArgs = [];
-        var callback = null;
-        function localCallback(err, what) {
-          self[name] = what;
-          callback(err, self);
-        }
-        for (var i=0; i < arguments.length; i++) {
-          if (typeof arguments[i] === 'function') {
-            callback = arguments[i];
-            fakeArgs.push(localCallback);
-          } else {
-            fakeArgs.push(arguments[i]);
-          }
-        }
-        if (callback === null) {
-          throw new Error("no callback passed");
-        }
-        createFunction.apply(null, fakeArgs);
-      }
-    }
+    this.child = function ( name, expansions, args ) {
+        var createFunction = Configuration.withExpansions( expansions || {}, args );
+        return function () {
+            var fakeArgs = [ ];
+            var callback = null;
+            function localCallback( err, what ) {
+                self[name] = what;
+                callback( err, self );
+            }
+            for (var i = 0; i < arguments.length; i++) {
+                if (typeof arguments[i] === 'function') {
+                    callback = arguments[i];
+                    fakeArgs.push( localCallback );
+                } else {
+                    fakeArgs.push( arguments[i] );
+                }
+            }
+            if (callback === null) {
+                throw new Error( "no callback passed" );
+            }
+            createFunction.apply( null, fakeArgs );
+        };
+    };
     return this;
 }
 
@@ -227,6 +227,66 @@ Configuration.withExpansions = function ( exps, args ) {
         context.args = args;
         try {
             return Configuration.prototype.constructor.apply( null, arguments );
+        } finally {
+            delete context.expansions;
+            delete context.args;
+        }
+    };
+};
+
+/**
+ * Create a read-only configuration object passed to the callback, which allows
+ * environment variables to override configuration values from files or defaults,
+ * including in nested objects.
+ */
+Configuration.withEnvironment = function () {
+    var newArgs = [ ];
+    var callback = null;
+    function cb( err, config ) {
+        callback( err, new EnvWrapper( config ) );
+    }
+    for (var i = 0; i < arguments.length; i++) {
+        if (typeof arguments[i] === 'function') {
+            callback = arguments[i];
+            newArgs.push( cb );
+        } else {
+            newArgs.push( arguments[i] );
+        }
+    }
+    if (typeof callback !== 'function') {
+        throw new Error( "No callback passed" );
+    }
+    return Configuration.prototype.constructor.apply( null, newArgs );
+};
+
+/**
+ * Create a read-only configuration object passed to the callback, which allows
+ * environment variables to override configuration values from files or defaults,
+ * including in nested objects.  Returns a function which, when called with the
+ * defaults, array of paths, callback, etc. will do the right thing.
+ */
+Configuration.withEnvironmentAndExpansions = function ( exps, args ) {
+    return function () {
+        var newArgs = [ ];
+        var callback = null;
+        function cb( err, config ) {
+            callback( err, new EnvWrapper( config ) );
+        }
+        for (var i = 0; i < arguments.length; i++) {
+            if (typeof arguments[i] === 'function') {
+                callback = arguments[i];
+                newArgs.push( cb );
+            } else {
+                newArgs.push( arguments[i] );
+            }
+        }
+        if (typeof callback !== 'function') {
+            throw new Error( "No callback passed" );
+        }
+        context.expansions = exps;
+        context.args = args;
+        try {
+            return Configuration.prototype.constructor.apply( null, newArgs );
         } finally {
             delete context.expansions;
             delete context.args;
