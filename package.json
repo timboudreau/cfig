@@ -25,7 +25,7 @@
     "url": "http://github.com/timboudreau/cfig/issues"
   },
   "dependencies": {
-    "hoek": "^4.2.0",
+    "hoek": "^5.0.3",
     "joi": "^13.0.1"
   }
 }
