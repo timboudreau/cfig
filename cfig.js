@@ -168,10 +168,14 @@ function Configuration() {
             }
         }
         if (arr.length === 0) {
-            hoek.merge( self, data );
+            if (self !== global && data !== global) {
+               hoek.merge( self, data );
+            }
             var last = cmdline.parseArgs( exp || Configuration.expansions, cargs || Configuration.args || process.argv.slice( 2 ) );
             hoek.merge( self, last );
-            hoek.merge( me, self ); // Compatibility
+            if (me !== global && self !== global) {
+                hoek.merge( me, self ); // Compatibility
+            }
             if (validate( self )) {
                 if (callback) {
                     callback( null, self );

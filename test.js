@@ -9,6 +9,9 @@ const Configuration = require( './cfig' )
         , Joi = require( 'joi' )
         ;
 
+const c = global.console;
+Object.defineProperty( global, 'console', {writable: false, value: c} );
+
 const cleanupDirs = [ ];
 const cleanupFiles = [ ];
 function cleanup() {
@@ -349,6 +352,21 @@ function testSetEnv() {
     assert.equal( 'foob', process.env['_wiggle'] );
 }
 
+exps = function ( filteredArgs, callback ) {
+    new Configuration.withExpansions( {c: 'console'} )( false, {moof: 'pwee'}, filteredArgs, 'snorks', callback );
+};
+
+function testGlobalConsoleIsNotOverwritten() {
+    var res = exps( [ '--console', '--moof', 'pwadge' ], ( err, data ) => {
+        if (err)
+            throw err;
+        assert( typeof console === 'object' );
+        assert( typeof console.log === 'function' );
+    } );
+    assert( typeof console === 'object' );
+    assert( typeof console.log === 'function' );
+}
+
 var failures = [ ];
 process.on( 'uncaughtException', ( err ) => {
     console.error( err );
@@ -396,5 +414,6 @@ runTests(
         testChild,
         testSetEnv,
         testEnvWrapper,
-        testEnvWrapperWithExpansions
+        testEnvWrapperWithExpansions,
+        testGlobalConsoleIsNotOverwritten
         );
